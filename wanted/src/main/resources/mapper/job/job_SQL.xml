@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="job">
+
+	<!-- 채용 공고 등록 -->
+	<insert id="jobBoardInsert" parameterType="hashMap" useGeneratedKeys="true" keyProperty="NOTICE_ID">
+		<selectKey keyProperty="NOTICE_ID" resultType="int" order="BEFORE">
+			SELECT SEQ_NOTICE_ID.NEXTVAL FROM DUAL
+		</selectKey>
+			INSERT INTO NOTICE (
+				NOTICE_ID,
+				TITLE,
+				COMPANY,
+				COUNTRY,
+				REGION,
+				POSITION,
+				EXPERIENCE,
+				COMP,
+				SKILL,
+				DETAIL
+			) VALUES (
+				#{NOTICE_ID},
+				#{TITLE},
+				#{COMPANY},
+				#{COUNTRY},
+				#{REGION},
+				#{POSITION},
+				#{EXPERIENCE},
+				#{COMP, jdbcType=NUMERIC},
+				#{SKILL},
+				#{DETAIL}
+			)
+	</insert>
+	
+	
+	<!-- 채용 공고 상세페이지 -->
+	<select id="jobBoardDetail" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT
+				NOTICE_ID, 
+				TITLE,
+				COMPANY, 
+				COUNTRY, 
+				REGION, 
+				POSITION, 
+				EXPERIENCE, 
+				COMP, 
+				SKILL, 
+				DETAIL, 
+				DELETE_YN
+			FROM
+				NOTICE
+			WHERE
+				NOTICE_ID = #{NOTICE_ID}
+		]]>
+	</select>
+	
+	
+	<!-- 해당 회사가 올린 다른 채용공고 -->
+	<select id="listByCompany" parameterType="hashmap" resultType="hashmap">
+		SELECT 
+			TITLE,
+			POSITION,
+			EXPERIENCE, 
+			SKILL,
+			NOTICE_ID
+		FROM 
+			NOTICE
+		WHERE 
+			COMPANY = #{COMPANY, jdbcType=VARCHAR}
+			AND NOTICE_ID != #{NOTICE_ID, jdbcType=INTEGER}
+			AND DELETE_YN = 'N'
+		ORDER BY 
+			NOTICE_ID DESC
+	</select>
+	
+	
+	<!-- 채용 공고 수정 -->
+	<update id="jobBoardUpdate" parameterType="hashmap">
+		UPDATE NOTICE
+		SET
+			TITLE = #{TITLE},
+			COUNTRY = #{COUNTRY}, 
+			REGION = #{REGION}, 
+			POSITION = #{POSITION}, 
+			EXPERIENCE = #{EXPERIENCE}, 
+			COMP = #{COMP}, 
+			SKILL = #{SKILL}, 
+			DETAIL = #{DETAIL}
+		WHERE
+			NOTICE_ID = #{NOTICE_ID}
+	</update>
+	
+	
+	<!-- 채용 공고 삭제 -->
+	<update id="jobBoardDelete" parameterType="hashmap">
+		<![CDATA[
+			UPDATE
+				NOTICE
+			SET
+				DELETE_YN = 'Y'
+			WHERE
+				NOTICE_ID = #{NOTICE_ID}
+		]]>
+	</update>
+	
+	
+	<!-- 채용 공고 리스트 -->
+	<select id="jobBoardList" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT 
+				ROW_NUMBER() OVER (ORDER BY NOTICE_ID DESC) RNUM, 
+				NOTICE_ID, 
+				TITLE,
+				COMPANY, 
+				COUNTRY, 
+				REGION, 
+				POSITION, 
+				EXPERIENCE, 
+				COMP, 
+				SKILL, 
+				DETAIL
+			FROM 
+				NOTICE
+			WHERE 
+				DELETE_YN = 'N'
+			ORDER BY 
+				NOTICE_ID DESC
+		]]>
+	</select>
+
+
+	<!-- 채용 공고 리스트 검색 -->
+	<select id="jobBoardSearchList" parameterType="hashmap" resultType="hashmap">
+		SELECT * FROM (
+			SELECT 
+				ROW_NUMBER() OVER (ORDER BY NOTICE_ID DESC) AS RNUM, 
+				NOTICE_ID, 
+				TITLE,
+				COMPANY, 
+				COUNTRY, 
+				REGION, 
+				POSITION, 
+				EXPERIENCE, 
+				COMP, 
+				SKILL, 
+				DETAIL
+			FROM 
+				NOTICE
+			WHERE 
+				DELETE_YN = 'N'
+				<if test="keyword != null and keyword != ''">
+					<if test="category != null and category != ''">
+						<choose>
+							<when test="category == 'TITLE'">
+								AND TITLE LIKE '%' || #{keyword} || '%'
+							</when>
+							<when test="category == 'COMPANY'">
+								AND COMPANY LIKE '%' || #{keyword} || '%'
+							</when>
+							<when test="category == 'COUNTRY'">
+								AND COUNTRY LIKE '%' || #{keyword} || '%'
+							</when>
+							<when test="category == 'POSITION'">
+								AND POSITION LIKE '%' || #{keyword} || '%'
+							</when>
+							<when test="category == 'EXPERIENCE'">
+								AND EXPERIENCE LIKE '%' || #{keyword} || '%'
+							</when>
+							<when test="category == 'SKILL'">
+								AND SKILL LIKE '%' || #{keyword} || '%'
+							</when>
+							<otherwise>
+								AND (
+								    TITLE LIKE '%' || #{keyword} || '%' 
+								    OR COMPANY LIKE '%' || #{keyword} || '%' 
+								    OR COUNTRY LIKE '%' || #{keyword} || '%'
+								    OR POSITION LIKE '%' || #{keyword} || '%'
+								    OR EXPERIENCE LIKE '%' || #{keyword} || '%'
+								    OR TO_CHAR(COMP) LIKE '%' || #{keyword} || '%'
+								    OR SKILL LIKE '%' || #{keyword} || '%'
+								    OR DETAIL LIKE '%' || #{keyword} || '%'
+								)
+							</otherwise>
+						</choose>
+					</if>
+				    <if test="category == null or category == ''">
+						AND (
+						    TITLE LIKE '%' || #{keyword} || '%' 
+						    OR COMPANY LIKE '%' || #{keyword} || '%' 
+						    OR COUNTRY LIKE '%' || #{keyword} || '%'
+						    OR POSITION LIKE '%' || #{keyword} || '%'
+						    OR EXPERIENCE LIKE '%' || #{keyword} || '%'
+						    OR TO_CHAR(COMP) LIKE '%' || #{keyword} || '%'
+						    OR SKILL LIKE '%' || #{keyword} || '%'
+						    OR DETAIL LIKE '%' || #{keyword} || '%'
+						)
+				    </if>
+				</if>
+		) WHERE RNUM BETWEEN #{START} AND #{END}
+	</select>
+
+
+	<!-- 총 채용 공고 수 -->
+	<select id="JobBoardTotal" resultType="int">
+		SELECT 
+			COUNT(*) 
+		FROM 
+			NOTICE 
+		WHERE 
+			DELETE_YN = 'N'
+	</select>
+</mapper>
